@@ -102,7 +102,7 @@ impl Descriptor {
 
                     // Theo's janky fix
                     if let Some(descriptor) =
-                        descriptors_for_family("Geneva").into_iter().next()
+                        descriptors_for_family("Noto Sans").into_iter().next()
                     {
                         fallbacks.push(descriptor.to_font(size, false))
                     };
