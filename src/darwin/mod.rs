@@ -48,10 +48,10 @@ const MISSING_GLYPH_INDEX: u32 = 0;
 /// The descriptor provides data about a font and supports creating a font.
 #[derive(Debug)]
 pub struct Descriptor {
-    family_name: String,
+    _family_name: String,
     font_name: String,
     style_name: String,
-    display_name: String,
+    _display_name: String,
     font_path: PathBuf,
 
     ct_descriptor: CTFontDescriptor,
@@ -60,10 +60,10 @@ pub struct Descriptor {
 impl Descriptor {
     fn new(desc: CTFontDescriptor) -> Descriptor {
         Descriptor {
-            family_name: desc.family_name(),
+            _family_name: desc.family_name(),
             font_name: desc.font_name(),
             style_name: desc.style_name(),
-            display_name: desc.display_name(),
+            _display_name: desc.display_name(),
             font_path: desc.font_path().unwrap_or_else(PathBuf::new),
             ct_descriptor: desc,
         }
@@ -72,7 +72,7 @@ impl Descriptor {
     /// Create a Font from this descriptor.
     pub fn to_font(&self, size: f64, load_fallbacks: bool) -> Font {
         let ct_font = ct_new_from_descriptor(&self.ct_descriptor, size);
-        let cg_font = ct_font.copy_to_CGFont();
+        let _cg_font = ct_font.copy_to_CGFont();
 
         let fallbacks = if load_fallbacks {
             descriptors_for_family("Menlo")
@@ -94,22 +94,30 @@ impl Descriptor {
                     // many chars. We add the symbols back in.
                     // Investigate if we can actually use the .-prefixed
                     // fallbacks somehow.
-                    if let Some(descriptor) =
-                        descriptors_for_family("Apple Symbols").into_iter().next()
-                    {
-                        fallbacks.push(descriptor.to_font(size, false))
-                    };
 
-                    // Theo's janky fix
-                    if let Some(descriptor) =
-                        descriptors_for_family("Noto Sans").into_iter().next()
-                    {
-                        fallbacks.push(descriptor.to_font(size, false))
-                    };
+                    // No, this is unnecessary; Apple Symbols will be included.
+                    // It's part of the cascade list requested already.
 
-                    // Include Menlo in the fallback list as well.
+                    // if let Some(descriptor) =
+                    // descriptors_for_family("Apple Symbols").into_iter().next()
+                    // {
+                    // fallbacks.push(descriptor.to_font(size, false))
+                    // };
+
+                    // Add Noto Sans Regular if available
+                    if get_family_names().contains(&"Noto Sans".to_string()) {
+                        if let Some(noto_regular) = descriptors_for_family("Noto Sans")
+                            .into_iter()
+                            .find(|d| d.style_name == "Regular")
+                        {
+                            fallbacks.push(noto_regular.to_font(size, false))
+                        }
+                    }
+
+                    // Include Menlo at the beginning of the fallback list
+                    // Otherwise it wouldn't be part of its own fallback...
                     fallbacks.insert(0, Font {
-                        cg_font: menlo.copy_to_CGFont(),
+                        _cg_font: menlo.copy_to_CGFont(),
                         ct_font: menlo,
                         fallbacks: Vec::new(),
                     });
@@ -121,7 +129,7 @@ impl Descriptor {
             Vec::new()
         };
 
-        Font { ct_font, cg_font, fallbacks }
+        Font { ct_font, _cg_font, fallbacks }
     }
 }
 
@@ -295,8 +303,7 @@ pub fn get_family_names() -> Vec<String> {
 fn cascade_list_for_languages(ct_font: &CTFont, languages: &[String]) -> Vec<Descriptor> {
     // Convert language type &Vec<String> -> CFArray.
     let langarr: CFArray<CFString> = {
-        let tmp: Vec<CFString> =
-            languages.iter().map(|language| CFString::new(&language)).collect();
+        let tmp: Vec<CFString> = languages.iter().map(|language| CFString::new(language)).collect();
         CFArray::from_CFTypes(&tmp)
     };
 
@@ -333,7 +340,7 @@ pub fn descriptors_for_family(family: &str) -> Vec<Descriptor> {
 #[derive(Clone)]
 pub struct Font {
     ct_font: CTFont,
-    cg_font: CGFont,
+    _cg_font: CGFont,
     fallbacks: Vec<Font>,
 }
 
@@ -563,6 +570,43 @@ mod tests {
                     println!();
                 }
             }
+        }
+    }
+
+    #[test]
+    fn high_glyph_fonts() {
+        let families = super::get_family_names();
+
+        for family in families {
+            let descriptors = super::descriptors_for_family(&family[..]);
+
+            if let Some(regular) = descriptors.into_iter().find(|d| d.style_name == "Regular") {
+                let ct = regular.to_font(13., false).ct_font;
+
+                let glyph_count = ct.glyph_count();
+
+                if glyph_count >= 2_000 {
+                    println!("{}: {}", regular.font_name, glyph_count);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn menlo_fallback_list() {
+        let menlo_regular = super::descriptors_for_family("Menlo")
+            .into_iter()
+            .find(|d| d.style_name == "Regular")
+            .unwrap();
+
+        let ct = super::ct_new_from_descriptor(&menlo_regular.ct_descriptor, 13.);
+
+        let fallbacks = super::cascade_list_for_languages(&ct, &["en".to_string()])
+            .into_iter()
+            .filter(|desc| !desc.font_path.as_os_str().is_empty());
+
+        for (index, desc) in fallbacks.enumerate() {
+            println!("{}: {}", (index + 1), desc.font_name);
         }
     }
 }
