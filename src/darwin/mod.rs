@@ -88,23 +88,20 @@ impl Descriptor {
                         .map(|desc| desc.to_font(size, false))
                         .collect::<Vec<_>>();
 
-                    // TODO, we can't use apple's proposed
-                    // .Apple Symbol Fallback (filtered out below),
-                    // but not having these makes us not able to render
-                    // many chars. We add the symbols back in.
-                    // Investigate if we can actually use the .-prefixed
-                    // fallbacks somehow.
+                    // TODO, we haven't found a way to use Apple's standard
+                    // .Apple Symbols Fallback font. And it's filtered out of
+                    // the cascade list requested above, due to not having a
+                    // path. The fallbacks that we do get, however, include the
+                    // normal Apple Symbols font. So there's no need to add it
+                    // manually, as was done here before. A test is now included
+                    // below, which prints a list of the few dozen fallback
+                    // fonts that are given for Menlo Regular (English).
 
-                    // No, this is unnecessary; Apple Symbols will be included.
-                    // It's part of the cascade list requested already.
-
-                    // if let Some(descriptor) =
-                    // descriptors_for_family("Apple Symbols").into_iter().next()
-                    // {
-                    // fallbacks.push(descriptor.to_font(size, false))
-                    // };
-
-                    // Add Noto Sans Regular if available
+                    // While there are still problems with font fallback on
+                    // macOS, we can improve the situation by adding Noto Sans
+                    // to the list -- only if it's available. Users who are
+                    // seeing issues with certain uncommon characters can be
+                    // advised to install Noto Sans.
                     if get_family_names().contains(&"Noto Sans".to_string()) {
                         if let Some(noto_regular) = descriptors_for_family("Noto Sans")
                             .into_iter()
@@ -114,8 +111,8 @@ impl Descriptor {
                         }
                     }
 
-                    // Include Menlo at the beginning of the fallback list
-                    // Otherwise it wouldn't be part of its own fallback...
+                    // Include Menlo at the beginning of the fallback list; it
+                    // wouldn't otherwise be part of its own cascade.
                     fallbacks.insert(0, Font {
                         _cg_font: menlo.copy_to_CGFont(),
                         ct_font: menlo,
@@ -574,25 +571,6 @@ mod tests {
     }
 
     #[test]
-    fn high_glyph_fonts() {
-        let families = super::get_family_names();
-
-        for family in families {
-            let descriptors = super::descriptors_for_family(&family[..]);
-
-            if let Some(regular) = descriptors.into_iter().find(|d| d.style_name == "Regular") {
-                let ct = regular.to_font(13., false).ct_font;
-
-                let glyph_count = ct.glyph_count();
-
-                if glyph_count >= 2_000 {
-                    println!("{}: {}", regular.font_name, glyph_count);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn menlo_fallback_list() {
         let menlo_regular = super::descriptors_for_family("Menlo")
             .into_iter()
@@ -605,8 +583,8 @@ mod tests {
             .into_iter()
             .filter(|desc| !desc.font_path.as_os_str().is_empty());
 
-        for (index, desc) in fallbacks.enumerate() {
-            println!("{}: {}", (index + 1), desc.font_name);
+        for (i, desc) in fallbacks.enumerate() {
+            println!("{}: {}", (i + 1), desc.font_name);
         }
     }
 }
