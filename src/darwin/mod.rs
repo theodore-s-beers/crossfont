@@ -48,10 +48,10 @@ const MISSING_GLYPH_INDEX: u32 = 0;
 /// The descriptor provides data about a font and supports creating a font.
 #[derive(Debug)]
 pub struct Descriptor {
-    _family_name: String,
+    family_name: String,
     font_name: String,
     style_name: String,
-    _display_name: String,
+    display_name: String,
     font_path: PathBuf,
 
     ct_descriptor: CTFontDescriptor,
@@ -60,10 +60,10 @@ pub struct Descriptor {
 impl Descriptor {
     fn new(desc: CTFontDescriptor) -> Descriptor {
         Descriptor {
-            _family_name: desc.family_name(),
+            family_name: desc.family_name(),
             font_name: desc.font_name(),
             style_name: desc.style_name(),
-            _display_name: desc.display_name(),
+            display_name: desc.display_name(),
             font_path: desc.font_path().unwrap_or_else(PathBuf::new),
             ct_descriptor: desc,
         }
@@ -72,7 +72,7 @@ impl Descriptor {
     /// Create a Font from this descriptor.
     pub fn to_font(&self, size: f64, load_fallbacks: bool) -> Font {
         let ct_font = ct_new_from_descriptor(&self.ct_descriptor, size);
-        let _cg_font = ct_font.copy_to_CGFont();
+        let cg_font = ct_font.copy_to_CGFont();
 
         let fallbacks = if load_fallbacks {
             descriptors_for_family("Menlo")
@@ -114,7 +114,7 @@ impl Descriptor {
                     // Include Menlo at the beginning of the fallback list; it
                     // wouldn't otherwise be part of its own cascade.
                     fallbacks.insert(0, Font {
-                        _cg_font: menlo.copy_to_CGFont(),
+                        cg_font: menlo.copy_to_CGFont(),
                         ct_font: menlo,
                         fallbacks: Vec::new(),
                     });
@@ -126,7 +126,7 @@ impl Descriptor {
             Vec::new()
         };
 
-        Font { ct_font, _cg_font, fallbacks }
+        Font { ct_font, cg_font, fallbacks }
     }
 }
 
@@ -337,7 +337,7 @@ pub fn descriptors_for_family(family: &str) -> Vec<Descriptor> {
 #[derive(Clone)]
 pub struct Font {
     ct_font: CTFont,
-    _cg_font: CGFont,
+    cg_font: CGFont,
     fallbacks: Vec<Font>,
 }
 
